@@ -1,1 +1,1 @@
-# ConsegnaProgettoSDCC
+# SistemiDistribuitiCloudComputing
