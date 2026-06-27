@@ -18,11 +18,14 @@ from app.modelli import (
 
 load_dotenv()
 
+# Carica la configurazione per le chiamate a Twelve Data.
+# Se l'URL non è specificato, viene usato l'endpoint ufficiale.
 URL_API_TWELVE_DATA = os.getenv(
     "URL_API_TWELVE_DATA",
     "https://api.twelvedata.com",
 ).rstrip("/")
 
+# Timeout massimo per evitare che le chiamate HTTP restino bloccate troppo a lungo.
 TIMEOUT_SECONDI = 10
 
 
@@ -41,6 +44,7 @@ class ErrorePortafoglioNonTrovato(Exception):
 def ottieni_chiave_api() -> str:
     """Restituisce la chiave API di Twelve Data."""
 
+    # La chiave API è obbligatoria per interrogare Twelve Data.
     chiave_api = os.getenv(
         "CHIAVE_API_TWELVE_DATA"
     )
@@ -54,11 +58,12 @@ def ottieni_chiave_api() -> str:
 
 
 def cerca_titoli_nel_catalogo_locale(
-        testo: str,
-        limite: int = 10,
+    testo: str,
+    limite: int = 10,
 ) -> list[dict[str, str]]:
     """Cerca titoli nel catalogo locale usato come fallback."""
 
+    # Normalizza il testo di ricerca per confrontarlo con ticker e nomi del catalogo locale.
     testo_normalizzato = testo.strip().lower()
 
     if not testo_normalizzato:
@@ -66,13 +71,14 @@ def cerca_titoli_nel_catalogo_locale(
 
     risultati = []
 
+    # Il catalogo locale viene usato come fallback quando il servizio esterno non è disponibile.
     for titolo in CATALOGO_TITOLI:
         ticker = titolo["ticker"]
         nome = titolo["nome"]
 
         if (
-                testo_normalizzato in ticker.lower()
-                or testo_normalizzato in nome.lower()
+            testo_normalizzato in ticker.lower()
+            or testo_normalizzato in nome.lower()
         ):
             risultati.append(
                 {
@@ -89,12 +95,13 @@ def cerca_titoli_nel_catalogo_locale(
 
 
 def crea_risposta_ricerca_locale(
-        testo: str,
-        limite: int,
-        messaggio: str,
+    testo: str,
+    limite: int,
+    messaggio: str,
 ) -> dict[str, object]:
     """Restituisce i risultati locali quando Twelve Data non è disponibile."""
 
+    # Restituisce una risposta con la stessa struttura della ricerca online.
     return {
         "origine": "catalogo_locale",
         "messaggio": messaggio,
@@ -106,12 +113,14 @@ def crea_risposta_ricerca_locale(
 
 
 def calcola_priorita_risultato_ricerca(
-        risultato: dict[str, str],
-        testo: str,
-        ticker_catalogo: set[str],
+    risultato: dict[str, str],
+    testo: str,
+    ticker_catalogo: set[str],
 ) -> tuple:
     """Definisce l'ordine dei risultati mostrati all'utente."""
 
+    # Restituisce una tupla usata da sorted per ordinare i risultati più rilevanti.
+    # I valori più piccoli hanno priorità maggiore.
     testo_normalizzato = testo.strip().lower()
 
     ticker = risultato["ticker"].strip().upper()
@@ -133,13 +142,14 @@ def calcola_priorita_risultato_ricerca(
 
 
 def unisci_e_ordina_risultati_ricerca(
-        risultati_online: list[dict[str, str]],
-        risultati_locali: list[dict[str, str]],
-        testo: str,
-        limite: int,
+    risultati_online: list[dict[str, str]],
+    risultati_locali: list[dict[str, str]],
+    testo: str,
+    limite: int,
 ) -> list[dict[str, str]]:
     """Unisce i risultati online e locali evitando duplicati."""
 
+    # Usa il ticker come chiave per evitare duplicati tra risultati online e locali.
     risultati_per_ticker = {}
 
     for risultato_online in risultati_online:
@@ -155,6 +165,8 @@ def unisci_e_ordina_risultati_ricerca(
             risultati_per_ticker[ticker] = risultato_locale
             continue
 
+        # Se il titolo è presente anche nel catalogo locale,
+        # vengono preferite alcune informazioni locali più controllate.
         risultato = risultati_per_ticker[
             ticker
         ]
@@ -197,8 +209,8 @@ def unisci_e_ordina_risultati_ricerca(
 
 
 def cerca_titoli_per_nome_o_ticker(
-        testo: str,
-        limite: int = 10,
+    testo: str,
+    limite: int = 10,
 ) -> dict[str, object]:
     """Cerca titoli tramite Twelve Data e integra il catalogo locale."""
 
@@ -214,12 +226,14 @@ def cerca_titoli_per_nome_o_ticker(
             "Il numero massimo di risultati deve essere compreso tra 1 e 10."
         )
 
+    # Prima viene preparato il fallback locale, così può essere usato in caso di errore online.
     risultati_locali = cerca_titoli_nel_catalogo_locale(
         testo=testo,
         limite=limite,
     )
 
     try:
+        # Prova a interrogare Twelve Data per ottenere risultati online.
         risposta = requests.get(
             f"{URL_API_TWELVE_DATA}/symbol_search",
             params={
@@ -230,9 +244,11 @@ def cerca_titoli_per_nome_o_ticker(
             timeout=TIMEOUT_SECONDI,
         )
     except (
-            requests.RequestException,
-            ErroreConfigurazioneQuotazioni,
+        requests.RequestException,
+        ErroreConfigurazioneQuotazioni,
     ):
+        # In caso di errore di rete o configurazione mancante,
+        # l'applicazione continua a funzionare usando il catalogo locale.
         return crea_risposta_ricerca_locale(
             testo=testo,
             limite=limite,
@@ -255,14 +271,14 @@ def cerca_titoli_per_nome_o_ticker(
         )
 
     if (
-            not risposta.ok
-            or not isinstance(
-        contenuto,
-        dict,
-    )
-            or contenuto.get(
-        "status"
-    ) == "error"
+        not risposta.ok
+        or not isinstance(
+            contenuto,
+            dict,
+        )
+        or contenuto.get(
+            "status"
+        ) == "error"
     ):
         return crea_risposta_ricerca_locale(
             testo=testo,
@@ -279,8 +295,8 @@ def cerca_titoli_per_nome_o_ticker(
     )
 
     if not isinstance(
-            dati,
-            list,
+        dati,
+        list,
     ):
         return crea_risposta_ricerca_locale(
             testo=testo,
@@ -291,6 +307,8 @@ def cerca_titoli_per_nome_o_ticker(
             ),
         )
 
+    # Dizionario di supporto per aggiungere il settore ai risultati online,
+    # quando il ticker è presente anche nel catalogo locale.
     settori_per_ticker = {
         titolo["ticker"].upper(): titolo["settore"]
         for titolo in CATALOGO_TITOLI
@@ -300,8 +318,8 @@ def cerca_titoli_per_nome_o_ticker(
 
     for elemento in dati:
         if not isinstance(
-                elemento,
-                dict,
+            elemento,
+            dict,
         ):
             continue
 
@@ -375,10 +393,11 @@ def cerca_titoli_per_nome_o_ticker(
 
 
 def ottieni_prezzo_corrente(
-        ticker: str,
+    ticker: str,
 ) -> Decimal:
     """Recupera il prezzo corrente di un ticker da Twelve Data."""
 
+    # Normalizza il ticker prima della chiamata al servizio esterno.
     ticker = ticker.strip().upper()
 
     if not ticker:
@@ -408,8 +427,8 @@ def ottieni_prezzo_corrente(
         ) from errore
 
     if not isinstance(
-            contenuto,
-            dict,
+        contenuto,
+        dict,
     ):
         raise ErroreServizioQuotazioni(
             "Twelve Data ha restituito una risposta non valida."
@@ -431,6 +450,8 @@ def ottieni_prezzo_corrente(
         )
 
     try:
+        # Converte il prezzo restituito dall'API in Decimal
+        # per mantenere precisione nei calcoli finanziari.
         return Decimal(
             str(
                 contenuto["price"]
@@ -440,6 +461,7 @@ def ottieni_prezzo_corrente(
         raise ErroreServizioQuotazioni(
             "Il prezzo restituito da Twelve Data non è numerico."
         ) from errore
+
 
 def ottieni_andamento_storico_titolo(
     ticker: str,
@@ -458,6 +480,7 @@ def ottieni_andamento_storico_titolo(
         )
 
     try:
+        # Recupera una serie storica giornaliera con prezzi di chiusura e volumi.
         risposta = requests.get(
             f"{URL_API_TWELVE_DATA}/time_series",
             params={
@@ -504,6 +527,8 @@ def ottieni_andamento_storico_titolo(
 
     punti = []
 
+    # Twelve Data restituisce i valori dal più recente al meno recente;
+    # reversed li riordina cronologicamente dal più vecchio al più recente.
     for valore in reversed(valori):
         if not isinstance(valore, dict):
             continue
@@ -526,6 +551,7 @@ def ottieni_andamento_storico_titolo(
             raise ErroreServizioQuotazioni(
                 "Twelve Data ha restituito un prezzo storico non valido."
             ) from errore
+
         try:
             volume_numerico = (
                 int(
@@ -565,9 +591,10 @@ def ottieni_andamento_storico_titolo(
         "punti": punti,
     }
 
+
 def aggiorna_quotazione_corrente(
-        sessione: Session,
-        ticker: str,
+    sessione: Session,
+    ticker: str,
 ) -> QuotazioneCorrente:
     """Recupera e salva il prezzo corrente di un ticker."""
 
@@ -582,6 +609,7 @@ def aggiorna_quotazione_corrente(
         ticker,
     )
 
+    # Se la quotazione esiste già viene aggiornata, altrimenti viene creata.
     if quotazione is None:
         quotazione = QuotazioneCorrente(
             ticker=ticker,
@@ -602,8 +630,8 @@ def aggiorna_quotazione_corrente(
 
 
 def aggiorna_quotazioni_portafoglio(
-        sessione: Session,
-        portafoglio_id: int,
+    sessione: Session,
+    portafoglio_id: int,
 ) -> dict:
     """
     Aggiorna le quotazioni di tutti i titoli presenti nel portafoglio.
@@ -622,6 +650,7 @@ def aggiorna_quotazioni_portafoglio(
             f"Il portafoglio con id={portafoglio_id} non esiste."
         )
 
+    # Recupera tutti i titoli del portafoglio ordinandoli per ticker.
     titoli = sessione.scalars(
         select(
             TitoloPosseduto
@@ -637,6 +666,7 @@ def aggiorna_quotazioni_portafoglio(
 
     ticker_aggiornati = []
 
+    # Aggiorna la quotazione corrente di ogni titolo presente nel portafoglio.
     for titolo in titoli:
         aggiorna_quotazione_corrente(
             sessione=sessione,
@@ -658,8 +688,8 @@ def aggiorna_quotazioni_portafoglio(
 
 
 def calcola_riepilogo_portafoglio(
-        sessione: Session,
-        portafoglio_id: int,
+    sessione: Session,
+    portafoglio_id: int,
 ) -> dict:
     """Calcola il riepilogo finanziario di un portafoglio."""
 
@@ -673,6 +703,7 @@ def calcola_riepilogo_portafoglio(
             f"Il portafoglio con id={portafoglio_id} non esiste."
         )
 
+    # Recupera i titoli associati al portafoglio.
     titoli = sessione.scalars(
         select(
             TitoloPosseduto
@@ -697,6 +728,7 @@ def calcola_riepilogo_portafoglio(
     dettagli_titoli = []
 
     for titolo in titoli:
+        # Per ogni titolo recupera la quotazione corrente già salvata nel database.
         quotazione = sessione.get(
             QuotazioneCorrente,
             titolo.ticker,
@@ -708,28 +740,30 @@ def calcola_riepilogo_portafoglio(
                 "non è disponibile. Aggiornare prima le quotazioni."
             )
 
+        # Calcola capitale investito, valore corrente e guadagno/perdita del singolo titolo.
         capitale_investito = (
-                titolo.quantita
-                * titolo.prezzo_medio_acquisto
+            titolo.quantita
+            * titolo.prezzo_medio_acquisto
         )
 
         valore_corrente = (
-                titolo.quantita
-                * quotazione.prezzo_corrente
+            titolo.quantita
+            * quotazione.prezzo_corrente
         )
 
         guadagno_perdita = (
-                valore_corrente
-                - capitale_investito
+            valore_corrente
+            - capitale_investito
         )
 
+        # La variazione percentuale non viene calcolata se il capitale investito è zero.
         if capitale_investito == 0:
             variazione_percentuale = None
         else:
             variazione_percentuale = (
-                    guadagno_perdita
-                    / capitale_investito
-                    * Decimal("100")
+                guadagno_perdita
+                / capitale_investito
+                * Decimal("100")
             )
 
         capitale_investito_totale += (
@@ -775,19 +809,20 @@ def calcola_riepilogo_portafoglio(
         )
 
     guadagno_perdita_totale = (
-            valore_corrente_totale
-            - capitale_investito_totale
+        valore_corrente_totale
+        - capitale_investito_totale
     )
 
     if capitale_investito_totale == 0:
         variazione_percentuale_totale = None
     else:
         variazione_percentuale_totale = (
-                guadagno_perdita_totale
-                / capitale_investito_totale
-                * Decimal("100")
+            guadagno_perdita_totale
+            / capitale_investito_totale
+            * Decimal("100")
         )
 
+    # Restituisce un dizionario usato dal frontend e dai servizi AI.
     return {
         "portafoglio_id": portafoglio.id,
         "nome_portafoglio": portafoglio.nome,

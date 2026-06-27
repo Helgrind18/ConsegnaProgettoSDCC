@@ -27,11 +27,13 @@ def crea_portafoglio(
 ) -> Portafoglio:
     """Crea un portafoglio e lo aggiunge alla sessione corrente."""
 
+    # Valida i dati ricevuti prima di creare il modello SQLAlchemy.
     dati_validati = PortafoglioInCreazione(
         nome=nome,
         descrizione=descrizione,
     )
 
+    # Crea il portafoglio usando soltanto dati già validati.
     portafoglio = Portafoglio(
         nome=dati_validati.nome,
         descrizione=dati_validati.descrizione,
@@ -50,17 +52,20 @@ def aggiungi_titolo_manualmente(
 ) -> TitoloPosseduto:
     """Inserisce manualmente un titolo all'interno di un portafoglio."""
 
+    # Verifica che il portafoglio esista prima di aggiungere un titolo.
     _ottieni_portafoglio(
         sessione=sessione,
         portafoglio_id=portafoglio_id,
     )
 
+    # Controlla che nello stesso portafoglio non esista già un titolo con lo stesso ticker.
     _verifica_ticker_disponibile(
         sessione=sessione,
         portafoglio_id=portafoglio_id,
         ticker=dati.ticker,
     )
 
+    # Crea il titolo da associare al portafoglio.
     titolo = TitoloPosseduto(
         portafoglio_id=portafoglio_id,
         ticker=dati.ticker,
@@ -85,12 +90,15 @@ def modifica_titolo(
 ) -> TitoloPosseduto:
     """Sostituisce i dati di un titolo già presente."""
 
+    # Recupera il titolo assicurandosi che appartenga al portafoglio indicato.
     titolo = _ottieni_titolo(
         sessione=sessione,
         portafoglio_id=portafoglio_id,
         titolo_id=titolo_id,
     )
 
+    # Controlla che il nuovo ticker non crei duplicati nello stesso portafoglio.
+    # Il titolo corrente viene escluso dal controllo.
     _verifica_ticker_disponibile(
         sessione=sessione,
         portafoglio_id=portafoglio_id,
@@ -98,6 +106,7 @@ def modifica_titolo(
         titolo_id_da_escludere=titolo_id,
     )
 
+    # Aggiorna i campi del titolo con i nuovi dati validati.
     titolo.ticker = dati.ticker
     titolo.quantita = dati.quantita
     titolo.prezzo_medio_acquisto = dati.prezzo_medio_acquisto
@@ -117,12 +126,15 @@ def elimina_titolo(
 ) -> None:
     """Elimina un titolo da un portafoglio."""
 
+    # Recupera il titolo da eliminare e verifica che appartenga al portafoglio indicato.
     titolo = _ottieni_titolo(
         sessione=sessione,
         portafoglio_id=portafoglio_id,
         titolo_id=titolo_id,
     )
 
+    # L'eliminazione viene eseguita sulla sessione corrente.
+    # Il commit sarà gestito dal livello superiore dell'applicazione.
     sessione.delete(titolo)
     sessione.flush()
 
@@ -133,11 +145,14 @@ def elimina_portafoglio(
 ) -> None:
     """Elimina un portafoglio e i dati collegati."""
 
+    # Recupera il portafoglio prima di eliminarlo.
     portafoglio = _ottieni_portafoglio(
         sessione=sessione,
         portafoglio_id=portafoglio_id,
     )
 
+    # L'eliminazione del portafoglio comporta anche l'eliminazione dei dati collegati,
+    # secondo le relazioni definite nei modelli SQLAlchemy.
     sessione.delete(portafoglio)
     sessione.flush()
 
@@ -148,6 +163,7 @@ def _ottieni_portafoglio(
 ) -> Portafoglio:
     """Restituisce un portafoglio oppure solleva un errore."""
 
+    # Cerca il portafoglio tramite chiave primaria.
     portafoglio = sessione.get(
         Portafoglio,
         portafoglio_id,
@@ -168,11 +184,14 @@ def _ottieni_titolo(
 ) -> TitoloPosseduto:
     """Restituisce un titolo appartenente al portafoglio indicato."""
 
+    # Verifica prima che il portafoglio esista.
     _ottieni_portafoglio(
         sessione=sessione,
         portafoglio_id=portafoglio_id,
     )
 
+    # Cerca il titolo solo all'interno del portafoglio indicato.
+    # Questo evita di modificare o eliminare titoli appartenenti ad altri portafogli.
     titolo = sessione.scalar(
         select(TitoloPosseduto).where(
             TitoloPosseduto.id == titolo_id,
@@ -197,11 +216,13 @@ def _verifica_ticker_disponibile(
 ) -> None:
     """Verifica che il ticker non sia già presente nel portafoglio."""
 
+    # Costruisce una query per cercare eventuali titoli con lo stesso ticker.
     istruzione = select(TitoloPosseduto).where(
         TitoloPosseduto.portafoglio_id == portafoglio_id,
         TitoloPosseduto.ticker == ticker,
     )
 
+    # Durante la modifica di un titolo, il titolo corrente viene escluso dal controllo.
     if titolo_id_da_escludere is not None:
         istruzione = istruzione.where(
             TitoloPosseduto.id != titolo_id_da_escludere

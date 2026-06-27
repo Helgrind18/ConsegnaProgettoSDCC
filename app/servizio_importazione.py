@@ -27,6 +27,7 @@ def importa_file_in_portafoglio(
 ) -> int:
     """Legge un file e salva i titoli soltanto se sono tutti validi."""
 
+    # Verifica che il portafoglio di destinazione esista prima di importare i titoli.
     portafoglio = sessione.get(
         Portafoglio,
         portafoglio_id,
@@ -37,6 +38,8 @@ def importa_file_in_portafoglio(
             f"Il portafoglio con id={portafoglio_id} non esiste."
         )
 
+    # Controlla l'estensione del file prima della lettura effettiva.
+    # L'applicazione accetta soltanto file CSV e JSON.
     estensione = (
         Path(nome_file)
         .suffix
@@ -51,15 +54,19 @@ def importa_file_in_portafoglio(
             "Sono accettati soltanto file CSV oppure JSON."
         )
 
+    # Converte il contenuto del file in una lista di righe.
     righe = leggi_file(
         nome_file=nome_file,
         contenuto_file=contenuto_file,
     )
 
+    # Valida tutte le righe lette dal file usando gli schemi Pydantic.
+    # Se almeno una riga non è valida, l'importazione viene interrotta.
     titoli = valida_titoli(
         righe
     )
 
+    # Evita di importare ticker già presenti nello stesso portafoglio.
     verifica_ticker_gia_presenti(
         sessione=sessione,
         portafoglio_id=portafoglio_id,
@@ -67,6 +74,7 @@ def importa_file_in_portafoglio(
     )
 
     for titolo in titoli:
+        # Crea il modello SQLAlchemy da salvare nel database per ogni titolo validato.
         titolo_da_salvare = TitoloPosseduto(
             portafoglio_id=portafoglio_id,
             ticker=titolo.ticker,
@@ -81,6 +89,8 @@ def importa_file_in_portafoglio(
             titolo_da_salvare
         )
 
+    # flush invia le modifiche al database nella transazione corrente,
+    # senza eseguire direttamente il commit.
     sessione.flush()
 
     return len(titoli)
@@ -93,11 +103,13 @@ def verifica_ticker_gia_presenti(
 ) -> None:
     """Controlla che i ticker non siano già presenti nel portafoglio."""
 
+    # Estrae l'elenco dei ticker che stanno per essere importati.
     ticker_da_importare = [
         titolo.ticker
         for titolo in titoli
     ]
 
+    # Cerca nel database eventuali ticker già presenti nello stesso portafoglio.
     ticker_esistenti = sessione.scalars(
         select(
             TitoloPosseduto.ticker

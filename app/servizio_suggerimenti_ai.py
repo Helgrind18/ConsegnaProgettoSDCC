@@ -1,3 +1,4 @@
+# Importa la funzione che cerca nel catalogo locale titoli appartenenti allo stesso settore.
 from app.catalogo_titoli import trova_titoli_simili_per_settore
 from app.servizio_analisi_ai import (
     ErroreConfigurazioneAnalisiAI,
@@ -13,6 +14,8 @@ def genera_spiegazione_locale(
 ) -> str:
     """Genera una spiegazione locale quando Gemini non è disponibile."""
 
+    # Costruisce una spiegazione semplice senza usare Gemini.
+    # Questa funzione viene usata come fallback.
     righe = [
         (
             "I titoli proposti sono stati selezionati perché "
@@ -22,6 +25,7 @@ def genera_spiegazione_locale(
         "",
     ]
 
+    # Elenca i titoli suggeriti usando solo dati presenti nel catalogo locale.
     for titolo in suggerimenti:
         righe.append(
             f"- {titolo['ticker']}: "
@@ -55,16 +59,19 @@ def genera_suggerimenti_titoli_simili(
 ) -> dict[str, object]:
     """Suggerisce titoli dello stesso settore e genera una spiegazione."""
 
+    # Normalizza i ticker già posseduti per escluderli dai suggerimenti.
     ticker_da_escludere = {
         ticker.upper()
         for ticker in ticker_posseduti
     }
 
+    # Cerca titoli dello stesso settore nel catalogo dimostrativo locale.
     suggerimenti = trova_titoli_simili_per_settore(
         settore=settore_riferimento,
         ticker_da_escludere=ticker_da_escludere,
     )
 
+    # Se non ci sono titoli simili disponibili, restituisce una risposta locale controllata.
     if not suggerimenti:
         return {
             "ticker_riferimento": ticker_riferimento,
@@ -77,6 +84,7 @@ def genera_suggerimenti_titoli_simili(
             "origine_spiegazione": "locale",
         }
 
+    # Prepara l'elenco dei suggerimenti da inserire nel prompt inviato a Gemini.
     elenco_suggerimenti = "\n".join(
         (
             f"- {titolo['ticker']}: "
@@ -87,6 +95,8 @@ def genera_suggerimenti_titoli_simili(
         for titolo in suggerimenti
     )
 
+    # Prompt controllato: Gemini deve usare solo i dati forniti
+    # e non deve produrre raccomandazioni finanziarie.
     richiesta = (
         "Scrivi una breve spiegazione in italiano dei titoli simili "
         "elencati di seguito.\n"
@@ -108,6 +118,7 @@ def genera_suggerimenti_titoli_simili(
     )
 
     try:
+        # Prima scelta: generare la spiegazione tramite Gemini.
         spiegazione = genera_testo(
             richiesta=richiesta
         )
@@ -118,6 +129,8 @@ def genera_suggerimenti_titoli_simili(
         ErroreConfigurazioneAnalisiAI,
         ErroreServizioAnalisiAI,
     ):
+        # Fallback: se Gemini non è configurato o non risponde,
+        # viene generata una spiegazione locale.
         spiegazione = genera_spiegazione_locale(
             ticker_riferimento=ticker_riferimento,
             settore_riferimento=settore_riferimento,

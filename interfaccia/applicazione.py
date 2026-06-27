@@ -9,14 +9,21 @@ import streamlit as st
 from dotenv import load_dotenv
 
 
+# Carica eventuali variabili d'ambiente definite nel file .env.
+# In questo frontend viene usata soprattutto URL_API per raggiungere il backend.
 load_dotenv()
 
+# URL del backend FastAPI.
+# Se non viene configurato diversamente, il frontend prova a collegarsi al backend locale.
 URL_API = os.getenv(
     "URL_API",
     "http://127.0.0.1:8000",
 ).rstrip("/")
 
+# Timeout standard per le richieste HTTP al backend.
 TIMEOUT_SECONDI = 10
+
+# Timeout più lungo per le operazioni AI, che possono richiedere più tempo.
 TIMEOUT_ANALISI_AI_SECONDI = 30
 
 
@@ -29,6 +36,7 @@ def invia_richiesta(
     """Invia una richiesta HTTP al backend FastAPI."""
 
     try:
+        # Tutte le chiamate HTTP verso FastAPI passano da questa funzione.
         return requests.request(
             method=metodo,
             url=f"{URL_API}{percorso}",
@@ -36,6 +44,7 @@ def invia_richiesta(
             **parametri,
         )
     except requests.RequestException as errore:
+        # In caso di errore di rete, viene mostrato un messaggio direttamente nell'interfaccia.
         st.error(
             "Impossibile comunicare con il backend FastAPI. "
             f"Dettaglio: {errore}"
@@ -50,6 +59,7 @@ def mostra_errore_api(
     """Mostra un errore restituito dal backend."""
 
     try:
+        # Se il backend restituisce un JSON, prova a leggere il campo "detail".
         contenuto = risposta.json()
         dettaglio = contenuto.get(
             "detail",
@@ -69,6 +79,7 @@ def salva_messaggio_successo(
 ) -> None:
     """Salva un messaggio e aggiorna la pagina."""
 
+    # Il messaggio viene salvato in sessione perché st.rerun ricarica la pagina.
     st.session_state["messaggio_successo"] = messaggio
     st.rerun()
 
@@ -76,6 +87,7 @@ def salva_messaggio_successo(
 def verifica_backend() -> bool:
     """Controlla che FastAPI sia raggiungibile."""
 
+    # Endpoint leggero usato per controllare se il backend è attivo.
     risposta = invia_richiesta(
         metodo="GET",
         percorso="/verifica-salute",
@@ -87,6 +99,7 @@ def verifica_backend() -> bool:
 def ottieni_portafogli() -> list[dict]:
     """Recupera i portafogli salvati."""
 
+    # Recupera dal backend l'elenco dei portafogli disponibili.
     risposta = invia_richiesta(
         metodo="GET",
         percorso="/portafogli",
@@ -107,6 +120,7 @@ def ottieni_titoli(
 ) -> list[dict]:
     """Recupera i titoli contenuti in un portafoglio."""
 
+    # Recupera dal backend i titoli associati al portafoglio selezionato.
     risposta = invia_richiesta(
         metodo="GET",
         percorso=f"/portafogli/{portafoglio_id}/titoli",
@@ -128,6 +142,7 @@ def cerca_titoli(
 ) -> dict | None:
     """Richiede al backend una ricerca assistita dei titoli."""
 
+    # Delega al backend la ricerca dei titoli tramite Twelve Data e catalogo locale.
     risposta = invia_richiesta(
         metodo="GET",
         percorso="/ricerca-titoli",
@@ -154,6 +169,7 @@ def formatta_risultato_ricerca(
 ) -> str:
     """Genera l'etichetta mostrata nel menu dei risultati."""
 
+    # L'etichetta contiene ticker, nome e, se disponibili, mercato e paese.
     parti = [
         risultato["ticker"],
         risultato["nome"],
@@ -184,6 +200,7 @@ def ottieni_andamento_titolo(
 ) -> dict | None:
     """Richiede al backend l'andamento storico di un titolo."""
 
+    # Richiede al backend lo storico del titolo, usato per il grafico Streamlit.
     risposta = invia_richiesta(
         metodo="GET",
         percorso=f"/titoli/{ticker}/andamento",
@@ -211,6 +228,7 @@ def ottieni_chiave_andamento_storico(
 ) -> str:
     """Restituisce la chiave usata per salvare lo storico nella sessione."""
 
+    # La chiave include portafoglio, ticker e periodo per evitare conflitti in session_state.
     return (
         f"andamento_storico_portafoglio_{portafoglio_id}"
         f"_ticker_{ticker}_giorni_{giorni}"
@@ -222,6 +240,7 @@ def aggiorna_quotazioni_portafoglio(
 ) -> dict | None:
     """Richiede al backend l'aggiornamento delle quotazioni."""
 
+    # Chiede al backend di aggiornare le quotazioni correnti dei titoli del portafoglio.
     risposta = invia_richiesta(
         metodo="POST",
         percorso=(
@@ -245,6 +264,7 @@ def ottieni_riepilogo_portafoglio(
 ) -> dict | None:
     """Recupera il riepilogo finanziario di un portafoglio."""
 
+    # Recupera il riepilogo finanziario calcolato dal backend.
     risposta = invia_richiesta(
         metodo="GET",
         percorso=(
@@ -268,6 +288,7 @@ def genera_analisi_ai_portafoglio(
 ) -> str | None:
     """Richiede al backend un'analisi AI del portafoglio."""
 
+    # Richiede al backend la generazione dell'analisi descrittiva del portafoglio.
     risposta = invia_richiesta(
         metodo="POST",
         percorso=(
@@ -295,6 +316,7 @@ def genera_suggerimenti_ai_titoli(
 ) -> dict | None:
     """Richiede al backend titoli simili per settore."""
 
+    # Richiede al backend i suggerimenti di titoli simili e la relativa spiegazione.
     risposta = invia_richiesta(
         metodo="POST",
         percorso=(
@@ -328,6 +350,7 @@ def elimina_analisi_ai_salvata(
 ) -> None:
     """Elimina l'analisi AI salvata quando cambiano i dati del portafoglio."""
 
+    # Rimuove l'analisi salvata perché potrebbe non essere più coerente con i dati aggiornati.
     st.session_state.pop(
         ottieni_chiave_analisi_ai(
             portafoglio_id=portafoglio_id,
@@ -358,6 +381,7 @@ def elimina_suggerimenti_ai_salvati(
         "_titolo_"
     )
 
+    # Cerca tutte le chiavi dei suggerimenti AI associate al portafoglio indicato.
     chiavi_da_eliminare = [
         chiave
         for chiave in st.session_state
@@ -390,6 +414,7 @@ def prepara_tabella_suggerimenti(
 ) -> list[dict]:
     """Prepara i suggerimenti per la tabella Streamlit."""
 
+    # Converte la struttura ricevuta dal backend in una forma più leggibile nella tabella.
     return [
         {
             "Ticker": titolo["ticker"],
@@ -406,11 +431,13 @@ def formatta_numero(
 ) -> str:
     """Formatta un numero con due cifre decimali."""
 
+    # Alcuni valori possono non essere disponibili, per esempio variazioni non calcolabili.
     if valore is None:
         return "Non disponibile"
 
     numero = float(valore)
 
+    # Converte la formattazione numerica nello stile italiano.
     return (
         f"{numero:,.2f}"
         .replace(",", "X")
@@ -435,6 +462,7 @@ def prepara_tabella_riepilogo(
 ) -> list[dict]:
     """Prepara i dettagli dei titoli per la tabella Streamlit."""
 
+    # Prepara i dati del riepilogo per mostrarli con st.dataframe.
     return [
         {
             "Ticker": titolo["ticker"],
@@ -471,6 +499,7 @@ def crea_portafoglio(
 ) -> None:
     """Richiede al backend la creazione di un portafoglio."""
 
+    # Invia al backend i dati necessari per creare un nuovo portafoglio.
     risposta = invia_richiesta(
         metodo="POST",
         percorso="/portafogli",
@@ -500,6 +529,7 @@ def elimina_portafoglio(
 ) -> None:
     """Richiede al backend l'eliminazione di un portafoglio."""
 
+    # Richiede al backend l'eliminazione del portafoglio selezionato.
     risposta = invia_richiesta(
         metodo="DELETE",
         percorso=f"/portafogli/{portafoglio_id}",
@@ -532,6 +562,7 @@ def inserisci_titolo_manualmente(
 ) -> None:
     """Invia al backend un titolo inserito manualmente."""
 
+    # Invia al backend i dati del titolo inserito manualmente o tramite ricerca assistita.
     risposta = invia_richiesta(
         metodo="POST",
         percorso=f"/portafogli/{portafoglio_id}/titoli",
@@ -575,6 +606,7 @@ def modifica_titolo(
 ) -> None:
     """Richiede al backend la modifica di un titolo."""
 
+    # Invia al backend i nuovi dati del titolo selezionato.
     risposta = invia_richiesta(
         metodo="PUT",
         percorso=(
@@ -615,6 +647,7 @@ def elimina_titolo(
 ) -> None:
     """Richiede al backend l'eliminazione di un titolo."""
 
+    # Richiede al backend l'eliminazione del titolo selezionato.
     risposta = invia_richiesta(
         metodo="DELETE",
         percorso=(
@@ -645,6 +678,7 @@ def importa_file(
 ) -> None:
     """Invia al backend un file CSV oppure JSON."""
 
+    # Invia al backend il file caricato dall'utente come multipart/form-data.
     risposta = invia_richiesta(
         metodo="POST",
         percorso=f"/portafogli/{portafoglio_id}/importazioni",
@@ -685,6 +719,7 @@ def formatta_portafoglio(
 ) -> str:
     """Genera l'etichetta mostrata nel menu dei portafogli."""
 
+    # Cerca il portafoglio corrispondente per mostrare un'etichetta più leggibile.
     for portafoglio in portafogli:
         if portafoglio["id"] == portafoglio_id:
             return (
@@ -701,6 +736,7 @@ def formatta_titolo(
 ) -> str:
     """Genera l'etichetta mostrata nel menu dei titoli."""
 
+    # Cerca il titolo corrispondente per mostrare un'etichetta più leggibile.
     for titolo in titoli:
         if titolo["id"] == titolo_id:
             return (
@@ -711,6 +747,7 @@ def formatta_titolo(
     return str(titolo_id)
 
 
+# Configurazione generale della pagina Streamlit.
 st.set_page_config(
     page_title="Gestione portafogli finanziari",
     page_icon="📈",
@@ -722,6 +759,7 @@ st.caption(
     "Interfaccia Streamlit collegata al backend FastAPI."
 )
 
+# Recupera un eventuale messaggio di successo salvato prima del rerun.
 messaggio_successo = st.session_state.pop(
     "messaggio_successo",
     None,
@@ -732,6 +770,7 @@ if messaggio_successo:
         messaggio_successo
     )
 
+# Prima di mostrare l'applicazione, verifica che il backend FastAPI sia raggiungibile.
 if verifica_backend():
     st.success(
         "Backend FastAPI raggiungibile."
@@ -742,6 +781,7 @@ else:
     )
     st.stop()
 
+# L'interfaccia è organizzata in tre schede principali.
 scheda_dashboard, scheda_portafogli, scheda_gestione = st.tabs(
     [
         "Dashboard",
@@ -750,6 +790,7 @@ scheda_dashboard, scheda_portafogli, scheda_gestione = st.tabs(
     ]
 )
 
+# Scheda dedicata al riepilogo finanziario, ai grafici e alle funzioni AI.
 with scheda_dashboard:
     st.header(
         "Dashboard finanziaria"
@@ -760,6 +801,7 @@ with scheda_dashboard:
         "le ultime quotazioni salvate nel database."
     )
 
+    # Recupera i portafogli disponibili per permettere all'utente di sceglierne uno.
     portafogli_dashboard = ottieni_portafogli()
 
     if not portafogli_dashboard:
@@ -788,6 +830,7 @@ with scheda_dashboard:
             "quando premi il pulsante di aggiornamento."
         )
 
+        # L'aggiornamento delle quotazioni viene eseguito solo su richiesta dell'utente.
         if st.button(
             "Aggiorna quotazioni",
             type="primary",
@@ -821,6 +864,7 @@ with scheda_dashboard:
                     f"{numero_aggiornati} ticker aggiornati."
                 )
 
+        # Dopo l'eventuale aggiornamento, recupera il riepilogo calcolato dal backend.
         riepilogo = ottieni_riepilogo_portafoglio(
             portafoglio_id=portafoglio_dashboard_id,
         )
@@ -883,6 +927,7 @@ with scheda_dashboard:
                 "Dettaglio dei titoli"
             )
 
+            # Prepara i dati dei titoli in un formato adatto alla tabella Streamlit.
             dettagli_titoli = prepara_tabella_riepilogo(
                 riepilogo["titoli"]
             )
@@ -910,6 +955,7 @@ with scheda_dashboard:
                 "quando premi il pulsante."
             )
 
+            # I grafici storici sono disponibili solo per i titoli presenti nel riepilogo.
             titoli_per_grafico = riepilogo[
                 "titoli"
             ]
@@ -965,6 +1011,7 @@ with scheda_dashboard:
                     )
                 )
 
+                # Lo storico viene richiesto al backend solo quando l'utente preme il pulsante.
                 if st.button(
                     "Mostra andamento",
                     key=(
@@ -987,11 +1034,13 @@ with scheda_dashboard:
                             chiave_andamento
                         ] = andamento
 
+                # Lo storico viene mantenuto in sessione per non perderlo a ogni refresh dell'interfaccia.
                 andamento_salvato = st.session_state.get(
                     chiave_andamento
                 )
 
                 if andamento_salvato:
+                    # Prepara i punti del grafico dei prezzi di chiusura.
                     punti_grafico = [
                         {
                             "data": punto["data"],
@@ -1017,6 +1066,7 @@ with scheda_dashboard:
                         height=420,
                     )
 
+                    # Prepara i punti del grafico dei volumi, se disponibili.
                     punti_volume = [
                         {
                             "data": punto["data"],
@@ -1074,6 +1124,7 @@ with scheda_dashboard:
             )
 
             if dettagli_titoli:
+                # L'analisi AI viene generata solo su richiesta dell'utente.
                 if st.button(
                     "Genera analisi AI",
                     key=(
@@ -1095,6 +1146,7 @@ with scheda_dashboard:
                             )
                         ] = analisi_ai
 
+                # L'analisi viene recuperata dalla sessione per restare visibile dopo il rerun.
                 analisi_ai_salvata = st.session_state.get(
                     ottieni_chiave_analisi_ai(
                         portafoglio_id=portafoglio_dashboard_id,
@@ -1122,6 +1174,7 @@ with scheda_dashboard:
             "spiegazione descrittiva dei risultati."
         )
 
+        # Recupera i titoli del portafoglio per scegliere il titolo di riferimento.
         titoli_dashboard = ottieni_titoli(
             portafoglio_id=portafoglio_dashboard_id,
         )
@@ -1145,6 +1198,7 @@ with scheda_dashboard:
                 ),
             )
 
+            # I suggerimenti AI vengono generati solo quando richiesto dall'utente.
             if st.button(
                 "Genera suggerimenti AI",
                 key=(
@@ -1171,6 +1225,7 @@ with scheda_dashboard:
                         )
                     ] = risultato_suggerimenti
 
+            # I suggerimenti vengono salvati in sessione per mantenerli visibili dopo il rerun.
             suggerimenti_salvati = st.session_state.get(
                 ottieni_chiave_suggerimenti_ai(
                     portafoglio_id=portafoglio_dashboard_id,
@@ -1207,11 +1262,13 @@ with scheda_dashboard:
             )
 
 
+# Scheda per creare, visualizzare ed eliminare portafogli.
 with scheda_portafogli:
     st.header(
         "Crea un nuovo portafoglio"
     )
 
+    # Il form evita che la creazione venga eseguita prima della conferma esplicita.
     with st.form(
         "creazione_portafoglio"
     ):
@@ -1248,6 +1305,7 @@ with scheda_portafogli:
         "Portafogli presenti"
     )
 
+    # Aggiorna l'elenco dei portafogli da mostrare nella tabella.
     portafogli = ottieni_portafogli()
 
     if portafogli:
@@ -1257,6 +1315,7 @@ with scheda_portafogli:
             use_container_width=True,
         )
 
+        # L'eliminazione viene messa in un expander separato per ridurre errori accidentali.
         with st.expander(
             "Elimina un portafoglio",
             expanded=False,
@@ -1303,6 +1362,7 @@ with scheda_portafogli:
             "Non sono ancora presenti portafogli."
         )
 
+# Scheda per inserire, importare, modificare ed eliminare titoli.
 with scheda_gestione:
     st.header(
         "Gestione dei titoli posseduti"
@@ -1334,6 +1394,7 @@ with scheda_gestione:
             "Titoli presenti"
         )
 
+        # Recupera i titoli già presenti nel portafoglio selezionato.
         titoli = ottieni_titoli(
             portafoglio_id=portafoglio_id,
         )
@@ -1350,6 +1411,7 @@ with scheda_gestione:
                 "non contiene ancora titoli."
             )
 
+        # La gestione è divisa in due colonne: inserimento manuale/assistito e importazione da file.
         colonna_inserimento, colonna_importazione = st.columns(
             2
         )
@@ -1372,6 +1434,7 @@ with scheda_gestione:
                 ),
             )
 
+            # Nella modalità assistita l'utente cerca il titolo e poi completa i dati mancanti.
             if modalita_inserimento == "Ricerca assistita":
                 st.caption(
                     "Cerca un'azienda per nome oppure ticker. "
@@ -1388,6 +1451,7 @@ with scheda_gestione:
                     ),
                 )
 
+                # La ricerca viene eseguita solo dopo la pressione del pulsante.
                 if st.button(
                     "Cerca titolo",
                     key=(
@@ -1418,6 +1482,7 @@ with scheda_gestione:
                                 )
                             ] = risultato_ricerca
 
+                # I risultati di ricerca vengono salvati in sessione per restare disponibili nel form.
                 ricerca_salvata = st.session_state.get(
                     (
                         "risultati_ricerca_titoli_"
@@ -1469,6 +1534,7 @@ with scheda_gestione:
                             ]
                         )
 
+                        # Il form consente di completare quantità, prezzo, settore e mercato prima dell'inserimento.
                         with st.form(
                             (
                                 "inserimento_assistito_"
@@ -1564,6 +1630,7 @@ with scheda_gestione:
                             "l'inserimento manuale."
                         )
 
+            # Nella modalità manuale l'utente compila direttamente tutti i campi del titolo.
             else:
                 st.caption(
                     "Inserisci direttamente ticker, settore e mercato."
@@ -1642,6 +1709,7 @@ with scheda_gestione:
                                 mercato=mercato.strip(),
                             )
 
+        # Colonna dedicata all'importazione di titoli tramite file CSV o JSON.
         with colonna_importazione:
             st.subheader(
                 "Importazione da file"
@@ -1670,6 +1738,7 @@ with scheda_gestione:
                         file_caricato=file_caricato,
                     )
 
+        # La sezione di modifica/eliminazione compare solo se esistono titoli nel portafoglio.
         if titoli:
             st.divider()
             st.subheader(
@@ -1691,6 +1760,7 @@ with scheda_gestione:
                 key="titolo_selezionato",
             )
 
+            # Recupera il dizionario completo del titolo selezionato.
             titolo_selezionato = next(
                 titolo
                 for titolo in titoli
@@ -1704,6 +1774,7 @@ with scheda_gestione:
                 ]
             )
 
+            # Colonna per modificare i dati del titolo selezionato.
             with colonna_modifica:
                 with st.form(
                     f"modifica_titolo_{titolo_id}"
@@ -1793,6 +1864,7 @@ with scheda_gestione:
                                 mercato=mercato_modificato.strip(),
                             )
 
+            # Colonna separata per l'eliminazione, con checkbox di conferma.
             with colonna_eliminazione:
                 st.warning(
                     "L'eliminazione del titolo è definitiva."
