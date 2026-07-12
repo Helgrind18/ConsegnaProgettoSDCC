@@ -8,11 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class PortafoglioInCreazione(BaseModel):
-    """Dati necessari per creare un nuovo portafoglio."""
-
-    # Configurazione comune dello schema:
-    # - rifiuta campi non previsti;
-    # - rimuove automaticamente gli spazi esterni dalle stringhe.
     model_config = ConfigDict(
         extra="forbid",
         str_strip_whitespace=True,
@@ -32,16 +27,12 @@ class PortafoglioInCreazione(BaseModel):
 
 
 class TitoloPossedutoInIngresso(BaseModel):
-    """Dati di un titolo inserito manualmente oppure importato da un file."""
-
-    # Anche per i titoli vengono rifiutati campi extra
-    # e vengono rimossi gli spazi esterni dalle stringhe.
     model_config = ConfigDict(
         extra="forbid",
         str_strip_whitespace=True,
     )
 
-    # Simbolo del titolo finanziario, per esempio AAPL o MSFT.
+    # Simbolo del ticker, per esempio AAPL o MSFT.
     ticker: Annotated[
         str,
         Field(min_length=1, max_length=15),
@@ -77,8 +68,6 @@ class TitoloPossedutoInIngresso(BaseModel):
     @field_validator("ticker", "mercato", mode="before")
     @classmethod
     def normalizza_testo_maiuscolo(cls, valore: object) -> object:
-        """Elimina gli spazi esterni e converte il testo in maiuscolo."""
-
         # Se il valore è testuale, viene normalizzato prima della validazione.
         if isinstance(valore, str):
             return valore.strip().upper()
@@ -88,8 +77,6 @@ class TitoloPossedutoInIngresso(BaseModel):
     @field_validator("data_acquisto")
     @classmethod
     def verifica_data_acquisto(cls, valore: date) -> date:
-        """Impedisce di inserire una data di acquisto futura."""
-
         # Non è consentito registrare acquisti con una data successiva a oggi.
         if valore > date.today():
             raise ValueError(

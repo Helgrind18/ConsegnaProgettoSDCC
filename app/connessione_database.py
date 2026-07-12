@@ -10,7 +10,7 @@ load_dotenv()
 
 
 def ottieni_variabile_ambiente_obbligatoria(nome: str) -> str:
-    #Restituisce una variabile d'ambiente oppure interrompe l'avvio.
+    # Restituisce una variabile d'ambiente oppure interrompe l'avvio.
     valore = os.getenv(nome)
     # Se la variabile richiesta non è presente, l'applicazione viene fermata evitando errori meno chiari in fase di connessione.
     if not valore:
@@ -37,7 +37,7 @@ url_database = URL.create(
 # Crea il motore SQLAlchemy, cioè l'oggetto che gestisce le connessioni al database.
 motore_database = create_engine(
     url_database,
-    pool_pre_ping=True, # contorlla la validità delle connessioni prima di riutilizzarlo
+    pool_pre_ping=True,  # contorlla la validità delle connessioni prima di riutilizzarlo
 )
 
 # Crea le sessioni per le connessioni dei database, ogni sessione permette di eseguire query e operazioni sul database.

@@ -20,8 +20,6 @@ from app.connessione_database import BaseModelli
 
 
 class Portafoglio(BaseModelli):
-    """Portafoglio personale contenente uno o più titoli."""
-
     # Nome della tabella associata al modello nel database.
     __tablename__ = "portafogli"
 
@@ -68,8 +66,6 @@ class Portafoglio(BaseModelli):
 
 
 class TitoloPosseduto(BaseModelli):
-    """Titolo presente in un portafoglio."""
-
     # Nome della tabella che contiene i titoli associati ai portafogli.
     __tablename__ = "titoli_posseduti"
 
@@ -118,7 +114,6 @@ class TitoloPosseduto(BaseModelli):
     )
 
     # Quantità posseduta del titolo.
-    # Numeric e Decimal sono usati per gestire valori finanziari con precisione.
     quantita: Mapped[Decimal] = mapped_column(
         Numeric(18, 6),
         nullable=False,
@@ -170,8 +165,6 @@ class TitoloPosseduto(BaseModelli):
 
 
 class QuotazioneCorrente(BaseModelli):
-    """Ultimo prezzo recuperato per un ticker."""
-
     # Nome della tabella che memorizza le quotazioni correnti dei ticker.
     __tablename__ = "quotazioni_correnti"
 

@@ -33,7 +33,7 @@ def leggi_json(contenuto: str) -> list[dict]:
         ) from errore
 
 
-def leggi_file(nome_file: str, contenuto_file: bytes,) -> list[dict]:
+def leggi_file(nome_file: str, contenuto_file: bytes, ) -> list[dict]:
     """Sceglie il lettore corretto in base all'estensione del file."""
 
     # Evita di elaborare file caricati senza contenuto.
